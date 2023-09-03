@@ -22,6 +22,7 @@ pub enum Error {
     UnclosedMap,
     EscapeInvalid,
     CharCodeInvalid(u32),
+    NumberOutOfRange,
     Message(String),
 }
 
@@ -57,6 +58,7 @@ impl Display for Error {
             Self::UnclosedMap => f.write_str("a map was opened '{' but not closed '}'"),
             Self::EscapeInvalid => f.write_str("an escape code was invalid"),
             Self::CharCodeInvalid(code) => write!(f, "the char code {:#06x} is not a valid character", code),
+            Self::NumberOutOfRange => write!(f, "a number was not in the range of the expected type"),
             Self::Message(msg) => f.write_str(msg),
         }
     }

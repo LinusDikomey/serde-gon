@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::ops::{AddAssign, MulAssign, Neg, SubAssign};
+use std::ops::{AddAssign, MulAssign, Neg, SubAssign, DivAssign};
 
 use serde::Deserialize;
 use serde::de::{
@@ -124,7 +124,7 @@ impl<'de> Deserializer<'de> {
         Ok(value)
     }
 
-    fn parse_optional_exponent(&mut self) -> Result<Option<(Sign, u64)>> {
+    fn parse_optional_exponent(&mut self) -> Result<Option<(Sign, u32)>> {
         (self.skip_if('e') || self.skip_if('E')).then(|| {
             self.input = &self.input[1..];
             let sign = match self.next_char()? {
@@ -136,10 +136,10 @@ impl<'de> Deserializer<'de> {
             if !matches!(first_digit, '0'..='9') {
                 return Err(Error::ExpectedInteger);
             }
-            let mut value = first_digit as u64 - b'0' as u64;
+            let mut value = first_digit as u32 - b'0' as u32;
             while self.peek_char().is_ok_and(|c| matches!(c, '0'..='9')) {
                 value *= 10;
-                value += self.next_char().unwrap() as u64 - b'0' as u64; // char is peeked so unwrap is fine here
+                value += self.next_char().unwrap() as u32 - b'0' as u32; // char is peeked so unwrap is fine here
             }
             Ok((sign, value))
         }).transpose()
@@ -147,7 +147,7 @@ impl<'de> Deserializer<'de> {
 
     fn parse_unsigned<T>(&mut self) -> Result<T>
     where
-        T: AddAssign<T> + MulAssign<T> + From<u8>,
+        T: AddAssign<T> + MulAssign<T> + DivAssign<T> + From<u8> + TryFrom<u64>,
     {
         self.eat_whitespace()?;
 
@@ -167,15 +167,19 @@ impl<'de> Deserializer<'de> {
                 _ => break
             }
         }
-        if let Some((_sign, _value)) = self.parse_optional_exponent()? {
-            todo!("apply exponents");
+        if let Some((sign, value)) = self.parse_optional_exponent()? {
+            let factor = 10u64.pow(value).try_into().map_err(|_| Error::NumberOutOfRange)?;
+            match sign {
+                Sign::Positive => int *= factor,
+                Sign::Negative => int /= factor,
+            }
         }
         Ok(int)
     }
 
     fn parse_signed<T>(&mut self) -> Result<T>
     where
-        T: Neg<Output = T> + AddAssign<T> + SubAssign<T> + MulAssign<T> + From<i8>,
+        T: Neg<Output = T> + AddAssign<T> + SubAssign<T> + MulAssign<T> + DivAssign<T> + From<i8> + TryFrom<u64>,
     {
         self.eat_whitespace()?;
 
@@ -211,11 +215,19 @@ impl<'de> Deserializer<'de> {
             }
         }
 
-        if let Some((_sign, _value)) = self.parse_optional_exponent()? {
-            todo!("apply exponents");
+        if let Some((sign, value)) = self.parse_optional_exponent()? {
+            let factor = 10u64.pow(value).try_into().map_err(|_| Error::NumberOutOfRange)?;
+            match sign {
+                Sign::Positive => int *= factor,
+                Sign::Negative => int /= factor,
+            }
         }
 
         Ok(int)
+    }
+
+    fn parse_float(&mut self) -> Result<f64> {
+        todo!("float parsing")
     }
 
     fn parse_string(&mut self) -> Result<Cow<'de, str>> {
@@ -365,18 +377,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             deserialize_u64 visit_u64,
     }
 
-    fn deserialize_f32<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
     where
          V: Visitor<'de>,
     {
-        todo!("floats")
+        visitor.visit_f32(self.parse_float() as f32)
     }
 
     fn deserialize_f64<V>(self, _visitor: V) -> Result<V::Value>
     where
          V: Visitor<'de>,
     {
-        todo!("floats")
+        visitor.visit_f64(self.parse_float() as f64)
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value>
