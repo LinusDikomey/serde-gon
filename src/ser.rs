@@ -7,7 +7,6 @@ pub struct Serializer {
     output: String,
 }
 
-
 pub fn to_string<T: Serialize>(value: T) -> Result<String> {
     let mut serializer = Serializer {
         output: String::new(),

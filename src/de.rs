@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::ops::{AddAssign, MulAssign, Neg, SubAssign, DivAssign};
+use std::str::FromStr;
 
 use serde::Deserialize;
 use serde::de::{
@@ -126,7 +127,6 @@ impl<'de> Deserializer<'de> {
 
     fn parse_optional_exponent(&mut self) -> Result<Option<(Sign, u32)>> {
         (self.skip_if('e') || self.skip_if('E')).then(|| {
-            self.input = &self.input[1..];
             let sign = match self.next_char()? {
                 '-' => Sign::Negative,
                 '+' => Sign::Positive,
@@ -226,8 +226,45 @@ impl<'de> Deserializer<'de> {
         Ok(int)
     }
 
-    fn parse_float(&mut self) -> Result<f64> {
-        todo!("float parsing")
+    fn parse_float<T>(&mut self) -> Result<T> where T: FromStr {
+        // PERF: parsing floats to a string first isn't optimal.
+        // validating the float and passing a slice should definitely work
+        let mut s = String::new();
+        let mut dot_seen = false;
+        match self.next_char()? {
+            c @ '1'..='9' => {
+                s.push(c);
+                while matches!(self.peek_char(), Ok('0'..='9')) {
+                    s.push(self.next_char().unwrap());
+                }
+            }
+            // leading zero is not allowed, don't expect more chars before the dot/exponent
+            '0' => s.push('0'),
+            '.' => {
+                s.push('.');
+                dot_seen = true;
+            }
+            _ => return Err(Error::ExpectedFloat),
+        }
+        if !dot_seen && self.skip_if('.') {
+            s.push('.');
+        }
+        while matches!(self.peek_char(), Ok('0'..='9')) {
+            s.push(self.next_char().unwrap());
+        }
+        if let Some((sign, exponent)) = self.parse_optional_exponent()? {
+            let sign = match sign {
+                Sign::Positive => '+',
+                Sign::Negative => '-',
+            };
+            use std::fmt::Write;
+            write!(s, "E{sign}{exponent}").unwrap();
+        }
+        match T::from_str(&s) {
+            Ok(x) => Ok(x),
+            // We have validated the float so it has a format rust can parse
+            Err(_) => unreachable!(),
+        }
     }
 
     fn parse_string(&mut self) -> Result<Cow<'de, str>> {
@@ -381,14 +418,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
          V: Visitor<'de>,
     {
-        visitor.visit_f32(self.parse_float() as f32)
+        visitor.visit_f32(self.parse_float()?)
     }
 
-    fn deserialize_f64<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value>
     where
          V: Visitor<'de>,
     {
-        visitor.visit_f64(self.parse_float() as f64)
+        visitor.visit_f64(self.parse_float()?)
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value>
@@ -818,6 +855,20 @@ mod tests {
 
         let j = r#"{"Struct":{"a":1}}"#;
         let expected = E::Struct { a: 1 };
+        assert_eq!(expected, from_str(j).unwrap());
+    }
+
+    #[test]
+    fn float_parsing() {
+        
+        #[derive(Deserialize, Debug, PartialEq)]
+        struct Floats {
+            my_f32: f32,
+            my_f64: f64,
+        }
+
+        let j = r#" my_f32 0.314159E+1 my_f64 1.234567"#;
+        let expected = Floats { my_f32: 3.14159, my_f64: 1.234567 };
         assert_eq!(expected, from_str(j).unwrap());
     }
 }
