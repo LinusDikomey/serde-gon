@@ -248,9 +248,9 @@ impl<'de> Deserializer<'de> {
         }
         if !dot_seen && self.skip_if('.') {
             s.push('.');
-        }
-        while matches!(self.peek_char(), Ok('0'..='9')) {
-            s.push(self.next_char().unwrap());
+            while matches!(self.peek_char(), Ok('0'..='9')) {
+                s.push(self.next_char().unwrap());
+            }
         }
         if let Some((sign, exponent)) = self.parse_optional_exponent()? {
             let sign = match sign {
@@ -865,10 +865,11 @@ mod tests {
         struct Floats {
             my_f32: f32,
             my_f64: f64,
+            whole_number: f64,
         }
 
-        let j = r#" my_f32 0.314159E+1 my_f64 1.234567"#;
-        let expected = Floats { my_f32: 3.14159, my_f64: 1.234567 };
+        let j = r#" my_f32 0.314159E+1 my_f64 1.234567 whole_number 4"#;
+        let expected = Floats { my_f32: 3.14159, my_f64: 1.234567, whole_number: 4.0 };
         assert_eq!(expected, from_str(j).unwrap());
     }
 }
