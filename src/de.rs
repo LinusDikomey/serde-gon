@@ -227,6 +227,9 @@ impl<'de> Deserializer<'de> {
     }
 
     fn parse_float<T>(&mut self) -> Result<T> where T: FromStr {
+        self.eat_whitespace()?;
+
+
         // PERF: parsing floats to a string first isn't optimal.
         // validating the float and passing a slice should definitely work
         let mut s = String::new();
