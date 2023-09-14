@@ -5,11 +5,13 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Error {
+    UnexpectedCharacter,
     TrailingCharacters,
     Eof,
     ExpectedBoolean,
     ExpectedInteger,
     ExpectedFloat,
+    ExpectedNumber,
     ExpectedString,
     ExpectedChar,
     ExpectedNull,
@@ -42,11 +44,13 @@ impl de::Error for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::UnexpectedCharacter => f.write_str("an unexpected character was encountered"),
             Self::TrailingCharacters => f.write_str("there where leftover characters in the input"),
             Self::Eof => f.write_str("unexpected end of file"),
             Self::ExpectedBoolean => f.write_str("expected a boolean"),
             Self::ExpectedInteger => f.write_str("expected an integer"),
             Self::ExpectedFloat => f.write_str("expected a float"),
+            Self::ExpectedNumber => f.write_str("expected a number"),
             Self::ExpectedString => f.write_str("expected a string"),
             Self::ExpectedChar => f.write_str("expected a char in the form of a single-character string"),
             Self::ExpectedNull => f.write_str("expected null"),

@@ -8,7 +8,7 @@ use serde::de::{
     VariantAccess, Visitor,
 };
 
-use crate::{Error, Result};
+use crate::{Error, Result, Number};
 
 pub fn from_str<'a, T: Deserialize<'a>>(input: &'a str) -> Result<T> {
     let mut deserializer = Deserializer::from_str(input);
@@ -183,11 +183,7 @@ impl<'de> Deserializer<'de> {
     {
         self.eat_whitespace()?;
 
-        let negative = self.peek_char() == Ok('-');
-        if negative {
-            // This doesn't error since we peeked the char before.
-            _ = self.next_char();
-        }
+        let negative = self.skip_if('-');
         let mut int = match self.next_char()? {
             ch @ '0'..='9' => {
                 let digit = T::from((ch as u8 - b'0') as i8);
@@ -233,6 +229,9 @@ impl<'de> Deserializer<'de> {
         // PERF: parsing floats to a string first isn't optimal.
         // validating the float and passing a slice should definitely work
         let mut s = String::new();
+        if self.skip_if('-') {
+            s.push('-');
+        }
         let mut dot_seen = false;
         match self.next_char()? {
             c @ '1'..='9' => {
@@ -243,6 +242,7 @@ impl<'de> Deserializer<'de> {
             }
             // leading zero is not allowed, don't expect more chars before the dot/exponent
             '0' => s.push('0'),
+            // we allow leading dot number notation like .5 even though json doesn't
             '.' => {
                 s.push('.');
                 dot_seen = true;
@@ -387,11 +387,49 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        let start = self.is_at_start();
         self.eat_whitespace()?;
 
         match self.peek_char()? {
-            '"' => self.deserialize_string(visitor),
-            _ => todo!("find out how to implement"),
+            '"' => {
+                let input = self.input;
+                let key_or_str = self.parse_quoted_string()?;
+                if start && self.peek_char().is_ok_and(|c| matches!(c, ':' | '{' | '[' | '"') || is_unquoted_string_char(c)) {
+                    // PERF: This parses the key twice.
+                    // this is definitely a top-level map, go back and just call deserialize_map.
+                    self.input = input;
+                    self.deserialize_map(visitor)
+                } else {
+                    match key_or_str {
+                        Cow::Owned(s) => visitor.visit_string(s),
+                        Cow::Borrowed(s) => visitor.visit_str(s),
+                    }
+                }
+            }
+            '[' => self.deserialize_seq(visitor),
+            '{' => self.deserialize_map(visitor),
+            c if is_unquoted_string_char(c) => match self.parse_unquoted_string()? {
+                "null" => visitor.visit_none(),
+                "true" => visitor.visit_bool(true),
+                "false" => visitor.visit_bool(false),
+                key_or_str => {
+                    let input = self.input;
+                    self.eat_whitespace()?;
+                    if start && self.peek_char().is_ok_and(|c| matches!(c, ':' | '{' | '[' | '"') || is_unquoted_string_char(c)) {
+                        // this is definitely a top-level map, go back and just call deserialize_map.
+                        // PERF: This parses the key twice.
+                        self.input = input;
+                        self.deserialize_map(visitor)
+                    } else {
+                        // this might still be a number, check that
+                        if let Ok(_number) = Number::try_from(key_or_str) {
+                            todo!("handle any numbers")
+                        }
+                        visitor.visit_borrowed_str(key_or_str)
+                    }
+                }
+            }
+            _ => return Err(Error::UnexpectedCharacter),
         }
     }
 
@@ -869,10 +907,11 @@ mod tests {
             my_f32: f32,
             my_f64: f64,
             whole_number: f64,
+            negative_float: f64,
         }
 
-        let j = r#" my_f32 0.314159E+1 my_f64 1.234567 whole_number 4"#;
-        let expected = Floats { my_f32: 3.14159, my_f64: 1.234567, whole_number: 4.0 };
+        let j = r#" my_f32 0.314159E+1 my_f64 1.234567 whole_number 4 negative_float -4.7 "#;
+        let expected = Floats { my_f32: 3.14159, my_f64: 1.234567, whole_number: 4.0, negative_float: -4.7 };
         assert_eq!(expected, from_str(j).unwrap());
     }
 }
