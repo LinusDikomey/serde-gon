@@ -128,7 +128,7 @@ enum NumberRepr {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Value, Number};
+    use crate::{Number, Value};
 
     #[test]
     fn deserialize_to_values() {

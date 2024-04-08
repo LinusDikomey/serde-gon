@@ -2,7 +2,6 @@ use serde::{ser, Serialize};
 
 use crate::{Error, Result};
 
-
 pub struct Serializer {
     output: String,
 }
@@ -53,7 +52,6 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(())
     }
 
-
     fn serialize_u8(self, v: u8) -> Result<()> {
         self.serialize_u64(u64::from(v))
     }
@@ -93,11 +91,9 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     fn serialize_str(self, v: &str) -> std::result::Result<Self::Ok, Self::Error> {
         self.output.reserve(2 + v.len());
         self.output += "\"";
-        self.output.extend(
-            v
-                .chars()
-                .flat_map(|c| escape_char(c).map_or(OneOrTwoChars::One(c), |(a, b)| OneOrTwoChars::Two(a, b)))
-        );
+        self.output.extend(v.chars().flat_map(|c| {
+            escape_char(c).map_or(OneOrTwoChars::One(c), |(a, b)| OneOrTwoChars::Two(a, b))
+        }));
         self.output += "\"";
         Ok(())
     }
@@ -167,7 +163,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         self.output += "[";
         Ok(self)
     }
-    
+
     fn serialize_tuple(self, len: usize) -> std::result::Result<Self::SerializeTuple, Self::Error> {
         self.serialize_seq(Some(len))
     }
@@ -198,11 +194,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
         Ok(self)
     }
 
-    fn serialize_struct(
-        self,
-        _name: &'static str,
-        len: usize,
-    ) -> Result<Self::SerializeStruct> {
+    fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         self.serialize_map(Some(len))
     }
 
@@ -230,7 +222,7 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
         }
         value.serialize(&mut **self)
     }
-    
+
     fn end(self) -> Result<()> {
         self.output += "]";
         Ok(())
@@ -326,7 +318,11 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized + Serialize>(&mut self, key: &'static str, value: &T) -> Result<()> {
+    fn serialize_field<T: ?Sized + Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<()> {
         if !self.output.ends_with('{') {
             self.output += ",";
         }
@@ -345,7 +341,11 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized + Serialize>(&mut self, key: &'static str, value: &T) -> Result<()> {
+    fn serialize_field<T: ?Sized + Serialize>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<()> {
         if !self.output.ends_with('{') {
             self.output += ",";
         }
@@ -360,7 +360,6 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
     }
 }
 
-
 fn escape_char(c: char) -> Option<(char, char)> {
     // TODO: add more escapes?
     match c {
@@ -372,7 +371,10 @@ fn escape_char(c: char) -> Option<(char, char)> {
 }
 
 #[derive(Clone, Copy)]
-enum OneOrTwoChars { One(char), Two(char, char) }
+enum OneOrTwoChars {
+    One(char),
+    Two(char, char),
+}
 impl IntoIterator for OneOrTwoChars {
     type Item = char;
     type IntoIter = OneOrTwoCharsIter;
@@ -386,7 +388,11 @@ impl IntoIterator for OneOrTwoChars {
 }
 
 #[derive(Clone, Copy)]
-enum OneOrTwoCharsIter { Empty, One(char), Two(char, char) }
+enum OneOrTwoCharsIter {
+    Empty,
+    One(char),
+    Two(char, char),
+}
 impl Iterator for OneOrTwoCharsIter {
     type Item = char;
 

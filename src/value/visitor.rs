@@ -89,7 +89,6 @@ impl<'de> serde::de::Visitor<'de> for ValueVisitor {
         self.visit_string(v.to_owned())
     }
 
-
     fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
@@ -122,14 +121,18 @@ impl<'de> serde::de::Visitor<'de> for ValueVisitor {
     where
         A: serde::de::SeqAccess<'de>,
     {
-        Ok(Value::Array(std::iter::from_fn(|| seq.next_element().transpose()).collect::<Result<_, _>>()?))
+        Ok(Value::Array(
+            std::iter::from_fn(|| seq.next_element().transpose()).collect::<Result<_, _>>()?,
+        ))
     }
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
         A: serde::de::MapAccess<'de>,
     {
-        Ok(Value::Map(std::iter::from_fn(|| map.next_entry().transpose()).collect::<Result<_, _>>()?))
+        Ok(Value::Map(
+            std::iter::from_fn(|| map.next_entry().transpose()).collect::<Result<_, _>>()?,
+        ))
     }
 }
 impl FromStr for Value {
@@ -139,4 +142,3 @@ impl FromStr for Value {
         crate::from_str(s)
     }
 }
-
