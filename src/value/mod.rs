@@ -3,6 +3,7 @@ use std::ops::Index;
 
 use crate::Error;
 
+mod ser;
 mod visitor;
 
 #[derive(Clone, Debug, Default, PartialEq)]
