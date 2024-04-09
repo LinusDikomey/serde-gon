@@ -82,6 +82,20 @@ impl<'de> serde::de::Visitor<'de> for ValueVisitor {
         Ok(Value::Number(v.into()))
     }
 
+    fn visit_f32<E>(self, v: f32) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Value::Number(v.into()))
+    }
+
+    fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Value::Number(v.into()))
+    }
+
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,

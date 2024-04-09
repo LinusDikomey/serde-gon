@@ -550,10 +550,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                         self.deserialize_map(visitor)
                     } else {
                         // this might still be a number, check that
-                        if let Ok(_number) = Number::try_from(key_or_str) {
-                            todo!("handle any numbers")
+                        if let Ok(number) = Number::try_from(key_or_str) {
+                            number.visit(visitor)
+                        } else {
+                            visitor.visit_borrowed_str(key_or_str)
                         }
-                        visitor.visit_borrowed_str(key_or_str)
                     }
                 }
             },
